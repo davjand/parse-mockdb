@@ -2,7 +2,6 @@ var _ = require('lodash'),
   sinon = require('sinon'),
   Parse = require('parse'),
 
-  lastObjectId = 1,
   registeredStubs = [],
 
   stubMethods;
@@ -12,7 +11,6 @@ if (typeof Parse.Parse != 'undefined') {
 }
 
 stubMethods = {
-  stubRequest: [Parse, '_request'],
   stubCollectionFetch: [Parse.Collection.prototype, 'fetch'],
   stubConfigGet: [Parse.Config, 'get'],
   stubQueryFind: [Parse.Query.prototype, 'find'],
@@ -32,7 +30,7 @@ for (var key in stubMethods) {
     stubMethods[key] = function (cb) {
       return registerStub(sinon.stub(object, methodName, function (options) {
         var promise = new Parse.Promise()._thenRunCallbacks(options),
-          data = cb.call(this, queryToJSON(this));
+        data = cb.call(this, queryToJSON(this));
 
         if (data) {
           data = addDefaultFields(data);
@@ -42,14 +40,38 @@ for (var key in stubMethods) {
 
         return promise;
       }));
-
     };
   })(object, methodName);
 
 }
 
+/**
+ * allows all Parse.Object
+ */
+function mockAllSaves() {
+  registerStub(sinon.stub(Parse, '_request', function(options) {
+    if (options.route != "classes" && options.method != "POST") {
+      return Parse._request(options);
+    }
+
+    var promise = new Parse.Promise.as(defaultFields());
+    return promise;
+  }));
+}
+
+function promiseResultSync(promise) {
+  var result;
+  promise.then(function(res) {
+    result = res;
+  });
+
+  return result;
+}
+
 Parse.Mock = _.extend(stubMethods, {
-  clearStubs: clearStubs
+  mockAllSaves: mockAllSaves,
+  clearStubs: clearStubs,
+  promiseResultSync: promiseResultSync,
 });
 
 module.exports = Parse.Mock;
@@ -91,9 +113,13 @@ function addDefaultFields(data) {
   //todo: walk model recursively
   //todo: don't override if exists
 
-  return _.defaults(data, {
-    id: lastObjectId++,
+  return _.defaults(data, defaultFields());
+}
+
+function defaultFields() {
+  return {
+    id:  _.uniqueId(),
     createdAt: new Date(),
     updatedAt: new Date()
-  });
+  };
 }
