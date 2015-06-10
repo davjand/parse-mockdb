@@ -57,7 +57,15 @@ function mockDB() {
     return realSave.call(this, options).then(function(savedObj) {
       // save to our local db
       db[options.className] = db[options.className] || [];
-      db[options.className].push(savedObj);
+
+      var objIndex = _.findIndex(db[options.className], function(obj) { return obj.id == savedObj.id; });
+      if (objIndex == -1) {
+        // new object
+        db[options.className].push(savedObj);
+      } else {
+        // update
+        db[options.className][objIndex] = savedObj;
+      }
 
       return savedObj;
     });
@@ -95,6 +103,10 @@ function matchesAfterIncluding(matches, includeClause) {
 
 function objectAfterReplacingPointerAtIncludePath(object, paths) {
   var path = paths.shift();
+  if (!object.get(path)) {
+    return object;
+  }
+
   var obj = objectForPointer(object.get(path));
   if (paths.length != 0) {
     object.attributes[path] = objectAfterReplacingPointerAtIncludePath(obj, paths);
@@ -120,15 +132,18 @@ function queryFilter(whereClause) {
     return _.reduce(whereClause, function(result, n, key) {
       var whereParams = whereClause[key];
       var match;
-      if (typeof whereParams == "object") {
+      if (typeof whereParams == "object" && whereParams) {
         if (whereParams["$in"]) {
           // containedIn
-
-          match = _.indexOf(whereParams["$in"], object.get(key)) != -1;
+          match = _.find(whereParams["$in"], function(target) {
+            return (object.get(key) !== undefined) &&
+              (target == object.get(key) ||
+               (target.objectId !== undefined && target.objectId == object.get(key).id));
+          });
         } else if (whereParams["__type"] == "Pointer") {
           // match on an object
           var storedItem = objectForPointer(whereParams);
-          match = object.get(key).id == storedItem.id;
+          match = object.get(key) && (object.get(key).id == storedItem.id);
         } else {
           throw new Error("unknown query where clause: " + JSON.stringify(whereParams));
         }
