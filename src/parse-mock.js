@@ -3,6 +3,7 @@ var _ = require('lodash'),
   Parse = require('parse'),
 
   registeredStubs = [],
+  db = {},
 
   stubMethods;
 
@@ -32,6 +33,10 @@ for (var key in stubMethods) {
         var promise = new Parse.Promise()._thenRunCallbacks(options),
         data = cb.call(this, queryToJSON(this));
 
+        if (methodName == "save") {
+          return data;
+        }
+
         if (data) {
           data = addDefaultFields(data);
         }
@@ -45,10 +50,105 @@ for (var key in stubMethods) {
 
 }
 
-/**
- * allows all Parse.Object
- */
-function mockAllSaves() {
+function mockDB() {
+  mockSaveRequests();
+  var realSave = Parse.Object.prototype.save;
+  Parse.Mock.stubObjectSave(function(options) {
+    return realSave.call(this, options).then(function(savedObj) {
+      // save to our local db
+      db[options.className] = db[options.className] || [];
+      db[options.className].push(savedObj);
+
+      return savedObj;
+    });
+  });
+
+  Parse.Mock.stubQueryFind(function(options) {
+    var classMatches = db[options.className];
+    var matches = _.filter(classMatches, queryFilter(options.where));
+    return matchesAfterIncluding(matches, options.include);
+  });
+
+  Parse.Mock.stubQueryFirst(function(options) {
+    var classMatches = db[options.className];
+    var matches = _.filter(classMatches, queryFilter(options.where));
+    return _.first(matchesAfterIncluding(matches, options.include));
+  });
+}
+
+function matchesAfterIncluding(matches, includeClause) {
+  if (!includeClause) {
+    return matches;
+  }
+
+  includeClauses = includeClause.split(",");
+  matches = _.map(matches, function(match) {
+    for (var i = 0; i < includeClauses.length; i++) {
+      var paths = includeClauses[i].split(".");
+      match = objectAfterReplacingPointerAtIncludePath(match, paths);
+    }
+    return match;
+  });
+
+  return matches;
+}
+
+function objectAfterReplacingPointerAtIncludePath(object, paths) {
+  var path = paths.shift();
+  var obj = objectForPointer(object.get(path));
+  if (paths.length != 0) {
+    object.attributes[path] = objectAfterReplacingPointerAtIncludePath(obj, paths);
+  }
+  return object
+};
+
+function objectForPointer(pointer) {
+  var className, objectId;
+  if (pointer.id && pointer.className) {
+    objectId = pointer.id;
+    className = pointer.className;
+  } else {
+    className = pointer["className"];
+    objectId = pointer["objectId"];
+  }
+  var storedItem = _.find(db[className], function(obj) { return obj.id == objectId; });
+  return storedItem;
+}
+
+function queryFilter(whereClause) {
+  return function(object) {
+    return _.reduce(whereClause, function(result, n, key) {
+      var whereParams = whereClause[key];
+      var match;
+      if (typeof whereParams == "object") {
+        if (whereParams["$in"]) {
+          // containedIn
+
+          match = _.indexOf(whereParams["$in"], object.get(key)) != -1;
+        } else if (whereParams["__type"] == "Pointer") {
+          // match on an object
+          var storedItem = objectForPointer(whereParams);
+          match = object.get(key).id == storedItem.id;
+        } else {
+          throw new Error("unknown query where clause: " + JSON.stringify(whereParams));
+        }
+      } else if (whereParams) {
+        // simple match
+        match = object.get(key) == whereParams;
+      } else {
+        match = true
+      }
+      return result && match;
+    }, true);
+  };
+}
+
+function cleanUp() {
+  db = {};
+  clearStubs();
+}
+
+function mockSaveRequests() {
   registerStub(sinon.stub(Parse, '_request', function(options) {
     if (options.route != "classes" && options.method != "POST") {
       return Parse._request(options);
@@ -69,7 +169,9 @@ function promiseResultSync(promise) {
 }
 
 Parse.Mock = _.extend(stubMethods, {
-  mockAllSaves: mockAllSaves,
+  mockDB: mockDB,
+  cleanUp: cleanUp,
+  mockSaveRequests: mockSaveRequests,
   clearStubs: clearStubs,
   promiseResultSync: promiseResultSync,
 });
