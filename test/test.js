@@ -25,13 +25,13 @@ function createItemP(price, brand) {
 function createStoreWithItemP(item) {
   var store = new Store();
   store.set("item", item);
-  return store.save()
+  return store.save();
 }
 
 function itemQueryP(price) {
   var query = new Parse.Query(Item);
   query.equalTo("price", price);
-  return query.find()
+  return query.find();
 }
 
 describe('ParseMock', function(){
@@ -53,7 +53,8 @@ describe('ParseMock', function(){
   it("should match a correct equalTo query on price", function(done) {
     createItemP(30).then(function(item) {
       itemQueryP(30).then(function(results) {
-        assert(results[0] == item);
+        assert(results[0].id == item.id);
+        assert(results[0].get("price") == item.get("price"));
         done();
       });
     });
@@ -70,8 +71,8 @@ describe('ParseMock', function(){
           query.first().then(function(result) {
             var resultItem = result.get("item");
             var resultBrand = resultItem.get("brand");
-            assert(resultItem == item);
-            assert(resultBrand.get("name") == brand.get("name"));
+            assert(resultItem.id == item.id);
+            assert(resultBrand.get("name") == "Acme");
             assert(resultBrand.id == brand.id);
             done();
           });
@@ -88,7 +89,7 @@ describe('ParseMock', function(){
         var query = new Parse.Query(Store);
         query.equalTo("item", item);
         query.find().then(function(results) {
-          assert(results[0] == savedStore);
+          assert(results[0].id == savedStore.id);
           done();
         });
       });
@@ -154,7 +155,7 @@ describe('ParseMock', function(){
       var query = new Parse.Query(Item);
       query.equalTo("price", 20);
       query.first().then(function(result) {
-        assert(result == item1);
+        assert(result.id == item1.id);
         done();
       });
     });
@@ -167,6 +168,25 @@ describe('ParseMock', function(){
       query.find().then(function(results) {
         assert(results.length == 1);
         done();
+      });
+    });
+  });
+
+  it("should not overwrite included objects after a save", function(done) {
+    createBrandP("Acme").then(function(brand) {
+      createItemP(30, brand).then(function(item) {
+        createStoreWithItemP(item).then(function(store) {
+          var query = new Parse.Query(Store);
+          query.include("item");
+          query.include("item.brand");
+          query.first().then(function(str) {
+            str.set("lol", "wut");
+            str.save().then(function(newStore) {
+              assert(str.get("item").get("brand").get("name") === brand.get("name"));
+              done();
+            });
+          });
+        });
       });
     });
   });

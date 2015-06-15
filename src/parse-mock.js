@@ -12,26 +12,31 @@ if (typeof Parse.Parse != 'undefined') {
 }
 
 stubMethods = {
-  stubCollectionFetch: [Parse.Collection.prototype, 'fetch'],
-  stubConfigGet: [Parse.Config, 'get'],
-  stubQueryFind: [Parse.Query.prototype, 'find'],
-  stubQueryFirst: [Parse.Query.prototype, 'first'],
-  stubQueryGet: [Parse.Query.prototype, 'get'],
-  stubQueryCount: [Parse.Query.prototype, 'count'],
-  stubObjectSave: [Parse.Object.prototype, 'save'],
-  stubObjectFetch: [Parse.Object.prototype, 'fetch'],
-  stubObjectDestroy: [Parse.Object.prototype, 'destroy']
+  stubCollectionFetch: {'object': Parse.Collection.prototype, methodName: 'fetch' , numArgs: 0},
+  stubConfigGet: {'object': Parse.Config, methodName: 'get' , numArgs: 0},
+  stubQueryFind: {'object': Parse.Query.prototype, methodName: 'find' , numArgs: 0},
+  stubQueryFirst: {'object': Parse.Query.prototype, methodName: 'first' , numArgs: 0},
+  stubQueryGet: {'object': Parse.Query.prototype, methodName: 'get' , numArgs: 1},
+  stubQueryCount: {'object': Parse.Query.prototype, methodName: 'count' , numArgs: 0},
+  stubObjectSave: {'object': Parse.Object.prototype, methodName: 'save' , numArgs: 0},
+  stubObjectFetch: {'object': Parse.Object.prototype, methodName: 'fetch' , numArgs: 0},
+  stubObjectDestroy: {'object': Parse.Object.prototype, methodName: 'destroy', numArgs: 0},
 };
 
 for (var key in stubMethods) {
-  var object = stubMethods[key][0],
-    methodName = stubMethods[key][1];
+  var object = stubMethods[key].object,
+  methodName = stubMethods[key].methodName,
+  numArgs = stubMethods[key].numArgs;
 
-  (function (object, methodName) {
+  (function (object, methodName, numArgs) {
     stubMethods[key] = function (cb) {
-      return registerStub(sinon.stub(object, methodName, function (options) {
-        var promise = new Parse.Promise()._thenRunCallbacks(options),
-        data = cb.call(this, queryToJSON(this));
+      return registerStub(sinon.stub(object, methodName, function () {
+        var promise = new Parse.Promise()._thenRunCallbacks();
+        if (numArgs == 0) {
+          data = cb.call(this, queryToJSON(this));
+        } else if (numArgs == 1) {
+          data = cb.call(this, queryToJSON(this), arguments[0]);
+        }
 
         if (methodName == "save") {
           return data;
@@ -46,42 +51,43 @@ for (var key in stubMethods) {
         return promise;
       }));
     };
-  })(object, methodName);
+  })(object, methodName, numArgs);
 
 }
 
 function mockDB() {
-  mockSaveRequests();
+  mockRequests();
   var realSave = Parse.Object.prototype.save;
   Parse.Mock.stubObjectSave(function(options) {
-    return realSave.call(this, options).then(function(savedObj) {
+    return realSave.call(this).then(function(savedObj) {
       // save to our local db
       db[options.className] = db[options.className] || [];
-
-      var objIndex = _.findIndex(db[options.className], function(obj) { return obj.id == savedObj.id; });
-      if (objIndex == -1) {
-        // new object
-        db[options.className].push(savedObj);
-      } else {
-        // update
-        db[options.className][objIndex] = savedObj;
-      }
-
+      db[options.className].push(storableFormat(savedObj, options.className));
       return savedObj;
     });
   });
+}
 
-  Parse.Mock.stubQueryFind(function(options) {
-    var classMatches = db[options.className];
-    var matches = _.filter(classMatches, queryFilter(options.where));
-    return matchesAfterIncluding(matches, options.include);
-  });
+function storableFormat(object, className) {
+  var storableData = {
+    id: object.id,
+    createdAt: object.createdAt.toJSON(),
+    updatedAt: object.updatedAt.toJSON(),
+    className: className,
+  };
 
-  Parse.Mock.stubQueryFirst(function(options) {
-    var classMatches = db[options.className];
-    var matches = _.filter(classMatches, queryFilter(options.where));
-    return _.first(matchesAfterIncluding(matches, options.include));
+  _.each(object.attributes, function(v, k) {
+    if (v.id) {
+      storableData[k] = {
+        __type: "Pointer",
+        objectId: v.id,
+        className: v.className
+      };
+    } else {
+      storableData[k] = v;
+    }
   });
+  return storableData;
 }
 
 function matchesAfterIncluding(matches, includeClause) {
@@ -93,7 +99,7 @@ function matchesAfterIncluding(matches, includeClause) {
   matches = _.map(matches, function(match) {
     for (var i = 0; i < includeClauses.length; i++) {
       var paths = includeClauses[i].split(".");
-      match = objectAfterReplacingPointerAtIncludePath(match, paths);
+      match = objectAfterReplacingAtIncludePaths(match, paths);
     }
     return match;
   });
@@ -101,29 +107,33 @@ function matchesAfterIncluding(matches, includeClause) {
   return matches;
 }
 
-function objectAfterReplacingPointerAtIncludePath(object, paths) {
-  var path = paths.shift();
-  if (!object.get(path)) {
-    return object;
-  }
-
-  var obj = objectForPointer(object.get(path));
+function objectAfterReplacingAtIncludePaths(object, paths) {
   if (paths.length != 0) {
-    object.attributes[path] = objectAfterReplacingPointerAtIncludePath(obj, paths);
+    var path = paths.shift();
+    if (!object[path]) {
+      return object;
+    }
+
+    var obj = objectForPath(object[path]);
+    object[path] = objectAfterReplacingAtIncludePaths(obj, paths);
   }
   return object
 };
 
-function objectForPointer(pointer) {
+function objectForPath(objectOrPointer) {
   var className, objectId;
-  if (pointer.id && pointer.className) {
-    objectId = pointer.id;
-    className = pointer.className;
+  if (objectOrPointer.__type == "Object") {
+    // fully formed, no need to look up
+    return objectOrPointer;
+  } else if (objectOrPointer.id && objectOrPointer.className) {
+    objectId = objectOrPointer.id;
+    className = objectOrPointer.className;
   } else {
-    className = pointer["className"];
-    objectId = pointer["objectId"];
+    className = objectOrPointer["className"];
+    objectId = objectOrPointer["objectId"];
   }
   var storedItem = _.find(db[className], function(obj) { return obj.id == objectId; });
+  storedItem.__type = "Object";
   return storedItem;
 }
 
@@ -136,20 +146,21 @@ function queryFilter(whereClause) {
         if (whereParams["$in"]) {
           // containedIn
           match = _.find(whereParams["$in"], function(target) {
-            return (object.get(key) !== undefined) &&
-              (target == object.get(key) ||
-               (target.objectId !== undefined && target.objectId == object.get(key).id));
+            return (object[key] !== undefined) &&
+              (target == object[key] ||
+               (target.objectId !== undefined && target.objectId == object[key].id));
           });
         } else if (whereParams["__type"] == "Pointer") {
           // match on an object
-          var storedItem = objectForPointer(whereParams);
-          match = object.get(key) && (object.get(key).id == storedItem.id);
+          var storedItem = objectForPath(whereParams);
+          match = object[key] && (object[key].id == storedItem.objectId);
         } else {
-          throw new Error("unknown query where clause: " + JSON.stringify(whereParams));
+          console.trace();
+          throw new Error("Parse-Mock: unknown query where clause: " + JSON.stringify(whereParams));
         }
       } else if (whereParams) {
         // simple match
-        match = object.get(key) == whereParams;
+        match = object[key] == whereParams;
       } else {
         match = true
       }
@@ -163,15 +174,48 @@ function cleanUp() {
   clearStubs();
 }
 
-function mockSaveRequests() {
+function mockRequests() {
   registerStub(sinon.stub(Parse, '_request', function(options) {
-    if (options.route != "classes" && options.method != "POST") {
-      return Parse._request(options);
+    var response, status, xhr;
+    switch (options.method) {
+      case "GET":
+      response = stubGetRequest(options);
+      status = "200";
+      break;
+      case "POST":
+      response = stubPostRequest(options);
+      status = "201";
+      break;
+      case "PUT":
+      response = stubPostRequest(options);
+      status = "200";
+      break;
+      default:
+      throw new Error("unknown request type");
     }
 
-    var promise = new Parse.Promise.as(defaultFields());
-    return promise;
+    xhr = {}; // TODO
+    return Parse.Promise.when([response, status, xhr]);
   }));
+}
+
+function stubGetRequest(options) {
+  var classMatches = db[options.className];
+  var matches = _.filter(classMatches, queryFilter(options.data.where));
+  matches = matchesAfterIncluding(matches, options.data.include);
+  ret = { "results": matches };
+  return ret;
+}
+
+function stubPostRequest(options) {
+  if (options.objectId) {
+    var data = {};//options.data;
+    data.updatedAt = (new Date()).toJSON();
+    return Parse.Promise.as(data);
+  }
+
+  var promise = new Parse.Promise.as(defaultFields());
+  return promise;
 }
 
 function promiseResultSync(promise) {
@@ -186,7 +230,7 @@ function promiseResultSync(promise) {
 Parse.Mock = _.extend(stubMethods, {
   mockDB: mockDB,
   cleanUp: cleanUp,
-  mockSaveRequests: mockSaveRequests,
+  mockRequests: mockRequests,
   clearStubs: clearStubs,
   promiseResultSync: promiseResultSync,
 });
@@ -236,7 +280,7 @@ function addDefaultFields(data) {
 function defaultFields() {
   return {
     id:  _.uniqueId(),
-    createdAt: new Date(),
-    updatedAt: new Date()
+    createdAt: (new Date()).toJSON(),
+    updatedAt: (new Date()).toJSON()
   };
 }
