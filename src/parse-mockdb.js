@@ -215,7 +215,7 @@ function queryFilter(whereClause) {
         } else if (whereParams["__type"] == "Pointer") {
           // match on an object
           var storedItem = fetchedObject(whereParams);
-          match = object[key] && (object[key].id == storedItem.objectId);
+          match = storedItem && object[key] && (object[key].id == storedItem.objectId);
         } else {
           console.trace();
           throw new Error("Parse-MockDB: unknown query where clause: " + JSON.stringify(whereParams));
