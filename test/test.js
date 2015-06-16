@@ -119,6 +119,16 @@ describe('ParseMock', function(){
     });
   });
 
+  it("should not match an incorrect equalTo query on price", function(done) {
+    createItemP(30).then(function(item) {
+      itemQueryP(20).then(function(results) {
+        assert(results.length == 0);
+        done();
+      });
+    });
+  });
+
+
   it("should not match an incorrect equalTo query on price and name", function(done) {
     createItemP(30).then(function(item) {
       var query = new Parse.Query(Item);
@@ -126,17 +136,6 @@ describe('ParseMock', function(){
       query.equalTo("name", "pants");
       query.find().then(function(results) {
         assert(results.length == 0);
-        done();
-      });
-    });
-  });
-
-  it("should match a correct containedIn query", function(done) {
-    createItemP(30).then(function(item) {
-      var query = new Parse.Query(Item);
-      query.containedIn("price", [20, 30]);
-      query.find().then(function(results) {
-        assert(results.length == 1);
         done();
       });
     });
@@ -200,6 +199,20 @@ describe('ParseMock', function(){
               done();
             });
           });
+        });
+      });
+    });
+  });
+
+  it("should update an existing object correctly", function(done) {
+    Parse.Promise.when([createItemP(30), createItemP(20)]).then(function(item1, item2) {
+      createStoreWithItemP(item1).then(function(store) {
+        item2.set("price", 10);
+        store.set("item", item2);
+        store.save().then(function(store) {
+          assert(store.get("item") == item2);
+          assert(store.get("item").get("price") == 10);
+          done();
         });
       });
     });

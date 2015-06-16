@@ -78,10 +78,15 @@ function stubGetRequest(options) {
  * Stubs a POST or PUT request (Parse.Object.save())
  */
 function stubPostOrPutRequest(options) {
+  if (options.route == "batch") {
+    // batch request. handle them seperately.
+    return _.map(options.data.requests, function(request) {
+      return { success: { updatedAt: (new Date()).toJSON() } };
+    });
+  }
+
   if (options.objectId) {
-    var data = {};//options.data;
-    data.updatedAt = (new Date()).toJSON();
-    return Parse.Promise.as(data);
+    return Parse.Promise.as({ updatedAt: (new Date()).toJSON() });
   }
 
   var promise = new Parse.Promise.as({
