@@ -8,18 +8,30 @@ if (typeof Parse.Parse != 'undefined') {
 }
 
 /**
- * Mocks a Parse API server, by intercepting requests and storing data locally
+ * Mocks a Parse API server, by intercepting requests and storing/querying data locally
  * in an in-memory DB.
  */
 function mockDB() {
   stubRequests();
+  stubSave();
+}
+
+/**
+ * Intercepts a save() request and writes the results of the save() to our
+ * in-memory DB
+ */
+function stubSave() {
   var realSave = Parse.Object.prototype.save;
   sinon.stub(Parse.Object.prototype, "save", function() {
     var options = this;
     return realSave.call(this).then(function(savedObj) {
       // save to our local db
       db[options.className] = db[options.className] || [];
-      db[options.className].push(storableFormat(savedObj, options.className));
+
+      var newObject = storableFormat(savedObj, options.className);
+      if (!_.find(db[options.className], function(obj) { return obj.id == options.id; })) {
+        db[options.className].push(newObject);
+      }
       return savedObj;
     });
   });
@@ -203,6 +215,11 @@ function fetchedObject(objectOrPointer) {
  */
 function queryFilter(whereClause) {
   return function(object) {
+    if (whereClause.objectId) {
+      // this is a get() request. simply match on ID
+      return object.id == whereClause.objectId;
+    }
+
     return _.reduce(whereClause, function(result, n, key) {
       var whereParams = whereClause[key];
       var match;
