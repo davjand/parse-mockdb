@@ -1,5 +1,5 @@
 var assert = require("assert")
-require('../src/parse-mock');
+require('../src/parse-mockdb');
 var Parse = require('parse').Parse;
 
 var Brand = Parse.Object.extend("Brand");
@@ -36,11 +36,11 @@ function itemQueryP(price) {
 
 describe('ParseMock', function(){
   beforeEach(function() {
-    Parse.Mock.mockDB();
+    Parse.MockDB.mockDB();
   });
 
   afterEach(function() {
-    Parse.Mock.cleanUp();
+    Parse.MockDB.cleanUp();
   });
 
   it("should save correctly", function(done) {
@@ -55,6 +55,20 @@ describe('ParseMock', function(){
       itemQueryP(30).then(function(results) {
         assert(results[0].id == item.id);
         assert(results[0].get("price") == item.get("price"));
+        done();
+      });
+    });
+  });
+
+  it('should save and find an item', function (done) {
+    var Item = Parse.Object.extend("Item");
+    var item = new Item();
+    item.set("price", 30);
+    item.save().then(function(item) {
+      var query = new Parse.Query(Item);
+      query.equalTo("price", 30);
+      return query.find().then(function(items) {
+        assert(items[0].get("price") == 30);
         done();
       });
     });

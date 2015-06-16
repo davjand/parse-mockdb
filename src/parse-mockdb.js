@@ -1,64 +1,17 @@
 var _ = require('lodash'),
   sinon = require('sinon'),
   Parse = require('parse'),
-
-  registeredStubs = [],
-  db = {},
-
-  stubMethods;
+  db = {};
 
 if (typeof Parse.Parse != 'undefined') {
   Parse = Parse.Parse;
 }
 
-stubMethods = {
-  stubCollectionFetch: {'object': Parse.Collection.prototype, methodName: 'fetch' , numArgs: 0},
-  stubConfigGet: {'object': Parse.Config, methodName: 'get' , numArgs: 0},
-  stubQueryFind: {'object': Parse.Query.prototype, methodName: 'find' , numArgs: 0},
-  stubQueryFirst: {'object': Parse.Query.prototype, methodName: 'first' , numArgs: 0},
-  stubQueryGet: {'object': Parse.Query.prototype, methodName: 'get' , numArgs: 1},
-  stubQueryCount: {'object': Parse.Query.prototype, methodName: 'count' , numArgs: 0},
-  stubObjectSave: {'object': Parse.Object.prototype, methodName: 'save' , numArgs: 0},
-  stubObjectFetch: {'object': Parse.Object.prototype, methodName: 'fetch' , numArgs: 0},
-  stubObjectDestroy: {'object': Parse.Object.prototype, methodName: 'destroy', numArgs: 0},
-};
-
-for (var key in stubMethods) {
-  var object = stubMethods[key].object,
-  methodName = stubMethods[key].methodName,
-  numArgs = stubMethods[key].numArgs;
-
-  (function (object, methodName, numArgs) {
-    stubMethods[key] = function (cb) {
-      return registerStub(sinon.stub(object, methodName, function () {
-        var promise = new Parse.Promise()._thenRunCallbacks();
-        if (numArgs == 0) {
-          data = cb.call(this, queryToJSON(this));
-        } else if (numArgs == 1) {
-          data = cb.call(this, queryToJSON(this), arguments[0]);
-        }
-
-        if (methodName == "save") {
-          return data;
-        }
-
-        if (data) {
-          data = addDefaultFields(data);
-        }
-
-        promise.resolve(data);
-
-        return promise;
-      }));
-    };
-  })(object, methodName, numArgs);
-
-}
-
 function mockDB() {
   mockRequests();
   var realSave = Parse.Object.prototype.save;
-  Parse.Mock.stubObjectSave(function(options) {
+  sinon.stub(Parse.Object.prototype, "save", function() {
+    var options = this;
     return realSave.call(this).then(function(savedObj) {
       // save to our local db
       db[options.className] = db[options.className] || [];
@@ -201,11 +154,12 @@ function evaluateMatch(obj1, obj2) {
 
 function cleanUp() {
   db = {};
-  clearStubs();
+  Parse.Object.prototype.save.restore();
+  Parse._request.restore();
 }
 
 function mockRequests() {
-  registerStub(sinon.stub(Parse, '_request', function(options) {
+  sinon.stub(Parse, '_request', function(options) {
     var response, status, xhr;
     switch (options.method) {
     case "GET":
@@ -226,7 +180,7 @@ function mockRequests() {
 
     xhr = {}; // TODO
     return Parse.Promise.when([response, status, xhr]);
-  }));
+  });
 }
 
 function stubGetRequest(options) {
@@ -244,7 +198,11 @@ function stubPostRequest(options) {
     return Parse.Promise.as(data);
   }
 
-  var promise = new Parse.Promise.as(defaultFields());
+  var promise = new Parse.Promise.as({
+    id:  _.uniqueId(),
+    createdAt: (new Date()).toJSON(),
+    updatedAt: (new Date()).toJSON()
+  });
   return promise;
 }
 
@@ -257,60 +215,17 @@ function promiseResultSync(promise) {
   return result;
 }
 
-Parse.Mock = _.extend(stubMethods, {
-  mockDB: mockDB,
-  cleanUp: cleanUp,
-  mockRequests: mockRequests,
-  clearStubs: clearStubs,
-  promiseResultSync: promiseResultSync,
-});
-
-module.exports = Parse.Mock;
-
-function registerStub(stub) {
-  registeredStubs.push(stub);
-
-  return stub;
-}
-
-function clearStubs() {
-  registeredStubs.forEach(function (stub) {
-    stub.restore();
-  })
-
-}
-
 function queryToJSON(query) {
   return _.extend(query.toJSON(), {
     className: query.className
   });
 }
 
-/**
- * Extends object tree with server-genereated fields
- *
- * @param data Array|Parse.Object
- * @returns {*}
- */
+Parse.MockDB = {
+  mockDB: mockDB,
+  cleanUp: cleanUp,
+  mockRequests: mockRequests,
+  promiseResultSync: promiseResultSync,
+};
 
-function addDefaultFields(data) {
-  if (Array.isArray(data)) {
-    return _.map(data, function (d) {
-      return addDefaultFields(d);
-    })
-  }
-
-  //todo: loop if array passed
-  //todo: walk model recursively
-  //todo: don't override if exists
-
-  return _.defaults(data, defaultFields());
-}
-
-function defaultFields() {
-  return {
-    id:  _.uniqueId(),
-    createdAt: (new Date()).toJSON(),
-    updatedAt: (new Date()).toJSON()
-  };
-}
+module.exports = Parse.MockDB;

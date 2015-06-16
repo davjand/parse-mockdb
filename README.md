@@ -1,67 +1,58 @@
-[![Build Status](https://snap-ci.com/rafbgarcia/angular-parse-wrapper/branch/master/build_image)](https://snap-ci.com/rafbgarcia/angular-parse-wrapper/branch/master)
-
-Parse Mock
+Parse MockDB
+=====================
+(Originally forked from parse-mock, https://github.com/dziamid/parse-mock)
 =====================
 
-A collection of stubs to ease unit-testing of Parse.com services.
+Provides a mock Parse backend and automatic stubbing of save() and _request to help unit test Parse cloud functions.  Simply call Parse.MockDB.mockDB(), and Parse MockDB will store models in memory and query / filter them appropriately.
 
-- Seamless Parse integration. New Mock Object
-- Use with any testing framework
-- Only sinon as a dependency
+Supports the following methods of the Parse JS SDK (promise-form only):
 
-Brought to you by the [DashBouquet](http://dashbouquet.com) team.
+Object.set()
+Object.save()
+Query.find()
+Query.first()
+Query.get()
+Query.equalTo()
+Query.include()
 
+Please help development of this library by adding additional features!
 
 ## Installation
 
 ```
-npm install parse-mock --save-dev
+npm install parse-mockdb --save-dev
 ```
 
-## Usage
+## Tests
 
 ```
-//karma.conf.js
+mocha test/test.js
+```
 
-module.exports = function (config) {
-  'use strict';
-  config.set({
-    basePath: '',
-    frameworks: ['jasmine', 'sinon'],
-    files: [
-      'your/app/build.js',
-      'src/vendor/parse-mock.js',
-      'your/app/**/*.spec.js'
-    ],
-    browsers: ['Chrome']
+## Example Test (see also test/test.js)
+
+```
+describe('Parse MockDB Test', function () {
+  beforeEach(function() {
+    Parse.MockDB.mockDB();
   });
-};
-```
 
+  afterEach(function() {
+    Parse.MockDB.cleanUp();
+  });
 
-```
-//sample.spec.js
-describe('My parsejs app', function () {
-
-  it('should load some data from parse', function () {
-    var stub = Parse.Mock.stubQueryFind(function (options) {
-      return [new Parse.Object('User', {name: 'Antony'})]
+  it('should save and find an item', function (done) {
+    var Item = Parse.Object.extend("Item");
+    var item = new Item();
+    item.set("price", 30);
+    item.save().then(function(item) {
+      var query = new Parse.Query(Item);
+      query.equalTo("price", 30);
+      return query.find().then(function(items) {
+        assert(items[0].get("price") == 30);
+        done();
+      });
     });
-
-    expect(getUser()).toBeUndefined();
-
-    loadUser(); //function that invokes Query.find
-
-    expect(getUser()).toBeDefined();
-    expect(stub.callCount).toEqual(1); //do assertions on stub object if necessary
-  }));
-
-  afterEach(inject(function () {
-    Parse.Mock.clearStubs(); //manually dispose of stubs
-  }));
-
-
+  });
 });
-
-
 ```
