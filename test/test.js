@@ -50,6 +50,16 @@ describe('ParseMock', function(){
     });
   });
 
+  it("should get a specific ID correctly", function(done) {
+    createItemP(30).then(function(item) {
+      var query = new Parse.Query(Item);
+      query.get(item.id).then(function(fetchedItem) {
+        assert(fetchedItem.id == item.id);
+        done();
+      });
+    });
+  });
+
   it("should match a correct equalTo query on price", function(done) {
     createItemP(30).then(function(item) {
       itemQueryP(30).then(function(results) {
@@ -69,6 +79,16 @@ describe('ParseMock', function(){
       query.equalTo("price", 30);
       return query.find().then(function(items) {
         assert(items[0].get("price") == 30);
+        done();
+      });
+    });
+  });
+
+  it('should save 2 items and get one for a first() query', function (done) {
+    Parse.Promise.when([createItemP(30), createItemP(20)]).then(function(item1, item2) {
+      var query = new Parse.Query(Item);
+      return query.first().then(function(item) {
+        assert(item.get("price") == 30);
         done();
       });
     });
