@@ -75,7 +75,6 @@ function storableFormat(object, className) {
     updatedAt: object.updatedAt.toJSON(),
     className: className,
   };
-
   _.each(object.attributes, function(v, k) {
     if (v.id) {
       storableData[k] = {
@@ -87,6 +86,7 @@ function storableFormat(object, className) {
       storableData[k] = v;
     }
   });
+
   return storableData;
 }
 
@@ -133,7 +133,9 @@ function objectForPath(objectOrPointer) {
     objectId = objectOrPointer["objectId"];
   }
   var storedItem = _.find(db[className], function(obj) { return obj.id == objectId; });
-  storedItem.__type = "Object";
+  if (storedItem) {
+    storedItem.__type = "Object";
+  }
   return storedItem;
 }
 
@@ -146,9 +148,7 @@ function queryFilter(whereClause) {
         if (whereParams["$in"]) {
           // containedIn
           match = _.find(whereParams["$in"], function(target) {
-            return (object[key] !== undefined) &&
-              (target == object[key] ||
-               (target.objectId !== undefined && target.objectId == object[key].id));
+            return evaluateMatch(target, object[key]);
           });
         } else if (whereParams["__type"] == "Pointer") {
           // match on an object
@@ -169,6 +169,36 @@ function queryFilter(whereClause) {
   };
 }
 
+function evaluateMatch(obj1, obj2) {
+  if (obj1 == undefined || obj2 == undefined) {
+    return false;
+  }
+
+  // scalar values
+  if (obj1 == obj2) {
+    return true;
+  }
+
+  // both pointers
+  if (obj1.objectId !== undefined && obj1.objectId == obj2.objectId) {
+    return true;
+  }
+
+  // both objects
+  if (obj1.id !== undefined && obj1.id == obj2.id) {
+    return true;
+  }
+
+  // one pointer, one object
+  if (obj1.id !== undefined && obj1.id == obj2.objectId) {
+    return true;
+  } else if (obj2.id !== undefined && obj2.id == obj1.objectId) {
+    return true;
+  }
+
+  return false;
+}
+
 function cleanUp() {
   db = {};
   clearStubs();
@@ -178,19 +208,19 @@ function mockRequests() {
   registerStub(sinon.stub(Parse, '_request', function(options) {
     var response, status, xhr;
     switch (options.method) {
-      case "GET":
+    case "GET":
       response = stubGetRequest(options);
       status = "200";
       break;
-      case "POST":
+    case "POST":
       response = stubPostRequest(options);
       status = "201";
       break;
-      case "PUT":
+    case "PUT":
       response = stubPostRequest(options);
       status = "200";
       break;
-      default:
+    default:
       throw new Error("unknown request type");
     }
 
@@ -200,7 +230,7 @@ function mockRequests() {
 }
 
 function stubGetRequest(options) {
-  var classMatches = db[options.className];
+  var classMatches = _.cloneDeep(db[options.className]);
   var matches = _.filter(classMatches, queryFilter(options.data.where));
   matches = matchesAfterIncluding(matches, options.data.include);
   ret = { "results": matches };
