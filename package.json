@@ -9,7 +9,7 @@
   "scripts": {},
   "repository": {
     "type": "git",
-    "url": "https://github.com/roddylindsay/parse-mockdb.git"
+    "url": "https://github.com/HustleInc/parse-mockdb.git"
   },
   "keywords": [
     "parse",
@@ -21,9 +21,9 @@
   "author": "Roddy Lindsay",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/roddylindsay/parse-mockdb/issues"
+    "url": "https://github.com/HustleInc/parse-mockdb/issues"
   },
-  "homepage": "https://github.com/roddylindsay/parse-mockdb",
+  "homepage": "https://github.com/HustleInc/parse-mockdb",
   "dependencies": {},
   "devDependencies": {
     "lodash": "^3.5.0",
