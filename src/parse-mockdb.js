@@ -170,7 +170,7 @@ function objectAfterReplacingAtIncludePaths(object, paths) {
     }
 
     var obj = fetchedObject(object[path]);
-    object[path] = objectAfterReplacingAtIncludePaths(obj, paths);
+    object[path] = _.cloneDeep(objectAfterReplacingAtIncludePaths(obj, paths));
   }
   return object
 };
