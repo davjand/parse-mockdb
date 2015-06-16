@@ -7,8 +7,12 @@ if (typeof Parse.Parse != 'undefined') {
   Parse = Parse.Parse;
 }
 
+/**
+ * Mocks a Parse API server, by intercepting requests and storing data locally
+ * in an in-memory DB.
+ */
 function mockDB() {
-  mockRequests();
+  stubRequests();
   var realSave = Parse.Object.prototype.save;
   sinon.stub(Parse.Object.prototype, "save", function() {
     var options = this;
@@ -21,6 +25,90 @@ function mockDB() {
   });
 }
 
+/**
+ * Unstubs Parse SDK requests and clears the local DB.
+ */
+function cleanUp() {
+  db = {};
+  Parse.Object.prototype.save.restore();
+  Parse._request.restore();
+}
+
+/**
+ * Intercepts calls to Parse._request, and returns the appropriate
+ * successful response based on the request parameters
+ */
+function stubRequests() {
+  sinon.stub(Parse, '_request', function(options) {
+    var response, status, xhr;
+    switch (options.method) {
+    case "GET":
+      response = stubGetRequest(options);
+      status = "200";
+      break;
+    case "POST":
+      response = stubPostOrPutRequest(options);
+      status = "201";
+      break;
+    case "PUT":
+      response = stubPostOrPutRequest(options);
+      status = "200";
+      break;
+    default:
+      throw new Error("unknown request type");
+    }
+
+    xhr = {}; // TODO
+    return Parse.Promise.when([response, status, xhr]);
+  });
+}
+
+/**
+ * Stubs a GET request (Parse.Query.find(), get(), first())
+ */
+function stubGetRequest(options) {
+  var classMatches = _.cloneDeep(db[options.className]);
+  var matches = _.filter(classMatches, queryFilter(options.data.where));
+  matches = queryMatchesAfterIncluding(matches, options.data.include);
+  ret = { "results": matches };
+  return ret;
+}
+
+/**
+ * Stubs a POST or PUT request (Parse.Object.save())
+ */
+function stubPostOrPutRequest(options) {
+  if (options.objectId) {
+    var data = {};//options.data;
+    data.updatedAt = (new Date()).toJSON();
+    return Parse.Promise.as(data);
+  }
+
+  var promise = new Parse.Promise.as({
+    id:  _.uniqueId(),
+    createdAt: (new Date()).toJSON(),
+    updatedAt: (new Date()).toJSON()
+  });
+  return promise;
+}
+
+/**
+ * Simple wrapper around promises known to be executed synchronously
+ * useful in test setup for seeding the local DB.
+ */
+function promiseResultSync(promise) {
+  var result;
+  promise.then(function(res) {
+    result = res;
+  });
+
+  return result;
+}
+
+/**
+ * Converts a fetched Parse object to its JSON format stored in the
+ * local DB
+ */
 function storableFormat(object, className) {
   var storableData = {
     id: object.id,
@@ -43,7 +131,12 @@ function storableFormat(object, className) {
   return storableData;
 }
 
-function matchesAfterIncluding(matches, includeClause) {
+/**
+ * Given a set of matches of a GET query (e.g. find()), returns fully
+ * fetched Parse Objects that include the nested objects requested by
+ * Parse.Query.include()
+ */
+function queryMatchesAfterIncluding(matches, includeClause) {
   if (!includeClause) {
     return matches;
   }
@@ -60,6 +153,10 @@ function matchesAfterIncluding(matches, includeClause) {
   return matches;
 }
 
+/**
+ * Recursive function that traverses an include path and replaces pointers
+ * with fully fetched objects
+ */
 function objectAfterReplacingAtIncludePaths(object, paths) {
   if (paths.length != 0) {
     var path = paths.shift();
@@ -67,13 +164,17 @@ function objectAfterReplacingAtIncludePaths(object, paths) {
       return object;
     }
 
-    var obj = objectForPath(object[path]);
+    var obj = fetchedObject(object[path]);
     object[path] = objectAfterReplacingAtIncludePaths(obj, paths);
   }
   return object
 };
 
-function objectForPath(objectOrPointer) {
+/**
+ * Given an object, a pointer, or a JSON representation of a Parse Object,
+ * return a fully fetched version of the Object.
+ */
+function fetchedObject(objectOrPointer) {
   var className, objectId;
   if (objectOrPointer.__type == "Object") {
     // fully formed, no need to look up
@@ -92,6 +193,9 @@ function objectForPath(objectOrPointer) {
   return storedItem;
 }
 
+/**
+ * Returns a function that filters query matches on a where clause
+ */
 function queryFilter(whereClause) {
   return function(object) {
     return _.reduce(whereClause, function(result, n, key) {
@@ -105,11 +209,11 @@ function queryFilter(whereClause) {
           });
         } else if (whereParams["__type"] == "Pointer") {
           // match on an object
-          var storedItem = objectForPath(whereParams);
+          var storedItem = fetchedObject(whereParams);
           match = object[key] && (object[key].id == storedItem.objectId);
         } else {
           console.trace();
-          throw new Error("Parse-Mock: unknown query where clause: " + JSON.stringify(whereParams));
+          throw new Error("Parse-MockDB: unknown query where clause: " + JSON.stringify(whereParams));
         }
       } else if (whereParams) {
         // simple match
@@ -122,6 +226,10 @@ function queryFilter(whereClause) {
   };
 }
 
+/**
+ * Evaluates whether 2 objects are the same, independent of their representation
+ * (e.g. Pointer, Object)
+ */
 function evaluateMatch(obj1, obj2) {
   if (obj1 == undefined || obj2 == undefined) {
     return false;
@@ -152,79 +260,9 @@ function evaluateMatch(obj1, obj2) {
   return false;
 }
 
-function cleanUp() {
-  db = {};
-  Parse.Object.prototype.save.restore();
-  Parse._request.restore();
-}
-
-function mockRequests() {
-  sinon.stub(Parse, '_request', function(options) {
-    var response, status, xhr;
-    switch (options.method) {
-    case "GET":
-      response = stubGetRequest(options);
-      status = "200";
-      break;
-    case "POST":
-      response = stubPostRequest(options);
-      status = "201";
-      break;
-    case "PUT":
-      response = stubPostRequest(options);
-      status = "200";
-      break;
-    default:
-      throw new Error("unknown request type");
-    }
-
-    xhr = {}; // TODO
-    return Parse.Promise.when([response, status, xhr]);
-  });
-}
-
-function stubGetRequest(options) {
-  var classMatches = _.cloneDeep(db[options.className]);
-  var matches = _.filter(classMatches, queryFilter(options.data.where));
-  matches = matchesAfterIncluding(matches, options.data.include);
-  ret = { "results": matches };
-  return ret;
-}
-
-function stubPostRequest(options) {
-  if (options.objectId) {
-    var data = {};//options.data;
-    data.updatedAt = (new Date()).toJSON();
-    return Parse.Promise.as(data);
-  }
-
-  var promise = new Parse.Promise.as({
-    id:  _.uniqueId(),
-    createdAt: (new Date()).toJSON(),
-    updatedAt: (new Date()).toJSON()
-  });
-  return promise;
-}
-
-function promiseResultSync(promise) {
-  var result;
-  promise.then(function(res) {
-    result = res;
-  });
-
-  return result;
-}
-
-function queryToJSON(query) {
-  return _.extend(query.toJSON(), {
-    className: query.className
-  });
-}
-
 Parse.MockDB = {
   mockDB: mockDB,
   cleanUp: cleanUp,
-  mockRequests: mockRequests,
   promiseResultSync: promiseResultSync,
 };
 
