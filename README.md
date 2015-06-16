@@ -3,7 +3,7 @@ Parse MockDB
 
 (Originally forked from parse-mock, https://github.com/dziamid/parse-mock)
 
-Provides a mock Parse backend and automatic stubbing of `Parse.Object.save()` and `Parse._request` to help unit test Parse cloud functions.  Simply call `Parse.MockDB.mockDB()`, and Parse MockDB will store models in memory and query / filter them appropriately.
+Provides a mock Parse backend and automatic stubbing of `Parse.Object.save()` and `Parse._request` to help unit test Parse cloud logic written in JavaScript.  Simply call `Parse.MockDB.mockDB()`, and Parse MockDB will store models in memory and query / filter them appropriately.
 
 Supports the following methods of the Parse JS SDK (promise-form only):
 
