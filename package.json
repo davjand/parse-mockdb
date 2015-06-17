@@ -4,7 +4,7 @@
   "description": "Parse",
   "main": "src/parse-mockdb.js",
   "engines": {
-    "node": "0.10.x"
+    "node": ">=0.10.3"
   },
   "scripts": {},
   "repository": {
@@ -28,7 +28,7 @@
   "devDependencies": {
     "lodash": "^3.5.0",
     "mocha": "^2.2.5",
-    "parse": "^1.3.5",
+    "parse": "^1.4.2",
     "sinon": "^1.14.1"
   }
 }
