@@ -116,7 +116,6 @@ describe('ParseMock', function(){
 
       var orQuery = Parse.Query.or(query, otherQuery);
       return orQuery.find().then(function(items) {
-        console.log(items);
         assert(items.length == 0);
         done();
       });
@@ -307,4 +306,29 @@ describe('ParseMock', function(){
       assert(storeMatches[0].id == store.id);
     });
   });
+
+  it('should find items not filtered by a notContainedIn', function (done) {
+    createItemP(30).then(function(item) {
+      var query = new Parse.Query(Item);
+      query.equalTo("price", 30);
+      query.notContainedIn("objectId", [234]);
+      query.find().then(function(items) {
+        assert(items.length == 1);
+        done();
+      });
+    });
+  });
+
+  it('should find not items filtered by a notContainedIn', function (done) {
+    createItemP(30).then(function(item) {
+      var query = new Parse.Query(Item);
+      query.equalTo("price", 30);
+      query.notContainedIn("objectId", [item.id]);
+      query.find().then(function(items) {
+        assert(items.length == 0);
+        done();
+      });
+    });
+  });
+
 })

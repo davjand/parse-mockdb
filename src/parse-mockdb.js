@@ -232,49 +232,69 @@ function queryFilter(whereClause) {
   }
 
   return function(object) {
-    if (whereClause.objectId) {
+    if (whereClause.objectId && typeof whereClause.objectId != "object") {
       // this is a get() request. simply match on ID
       return object.id == whereClause.objectId;
     }
 
-    return _.reduce(whereClause, function(result, n, key) {
-      var whereParams = whereClause[key];
-      var match;
-      if (typeof whereParams == "object" && whereParams) {
-        if (whereParams["$in"]) {
-          // containedIn
-          match = _.find(whereParams["$in"], function(target) {
-            return evaluateMatch(target, object[key]);
-          });
-        } else if (whereParams["__type"] == "Pointer") {
-          // match on an object
-          var storedItem = fetchedObject(whereParams);
-          match = storedItem && object[key] && (object[key].id == storedItem.objectId);
-        } else if (whereParams["$select"]) {
-          var foreignKey = whereParams["$select"]["key"];
-          var query = whereParams["$select"]["query"];
-          var matches = recursivelyMatch(query.className, query.where);
-          var objectMatches = _.filter(matches, function(match) { return object[key] == match[foreignKey]; })
-          match = objectMatches.length > 0;
-        } else {
-          throw new Error("Parse-MockDB: unknown query where clause: " + JSON.stringify(whereParams));
-        }
-      } else if (whereParams) {
-        // simple match
-        match = object[key] == whereParams;
-      } else {
-        match = true
-      }
+    return _.reduce(whereClause, function(result, whereParams, key) {
+      var match = evaluateObject(object, whereParams, key);
       return result && match;
     }, true);
   };
+}
+
+// special case objectId queries
+function keyAfterSpecialCasingId(key) {
+  if (key === "objectId") {
+    key = "id";
+  }
+  return key;
+}
+
+function evaluateObject(object, whereParams, key) {
+  if (typeof whereParams == "object" && whereParams) {
+    if (whereParams["$in"]) {
+      // containedIn
+      key = keyAfterSpecialCasingId(key);
+      return _.find(whereParams["$in"], function(target) {
+        return objectsAreEqual(target, object[key]);
+      });
+    } else if (whereParams["$nin"]) {
+      // notContainedIn
+      key = keyAfterSpecialCasingId(key);
+      return _.find(whereParams["$nin"], function(target) {
+        return !objectsAreEqual(target, object[key]);
+      });
+    } else if (whereParams["__type"] == "Pointer") {
+      // match on an object
+      var storedItem = fetchedObject(whereParams);
+      return storedItem && object[key] && (object[key].id == storedItem.objectId);
+    } else if (whereParams["$select"]) {
+      var foreignKey = whereParams["$select"]["key"];
+      var query = whereParams["$select"]["query"];
+      var matches = recursivelyMatch(query.className, query.where);
+      var objectMatches = _.filter(
+        matches,
+        function(match) { return object[key] == match[foreignKey]; }
+      );
+      return objectMatches.length > 0;
+    } else {
+      throw new Error("Parse-MockDB: unknown query where clause: " + JSON.stringify(whereParams));
+    }
+  } else if (whereParams) {
+    // simple match
+    return object[key] == whereParams;
+  } else {
+    return true;
+  }
 }
 
 /**
  * Evaluates whether 2 objects are the same, independent of their representation
  * (e.g. Pointer, Object)
  */
-function evaluateMatch(obj1, obj2) {
+function objectsAreEqual(obj1, obj2) {
   if (obj1 == undefined || obj2 == undefined) {
     return false;
   }
