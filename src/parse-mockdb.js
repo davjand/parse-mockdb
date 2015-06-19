@@ -223,6 +223,14 @@ var recursivelyMatch = function(className, whereClause) {
  * Returns a function that filters query matches on a where clause
  */
 function queryFilter(whereClause) {
+  if (whereClause["$or"]) {
+    return function(object) {
+      return _.reduce(whereClause["$or"], function(result, subclause) {
+        return result || queryFilter(subclause)(object);
+      }, false);
+    }
+  }
+
   return function(object) {
     if (whereClause.objectId) {
       // this is a get() request. simply match on ID
@@ -249,7 +257,6 @@ function queryFilter(whereClause) {
           var objectMatches = _.filter(matches, function(match) { return object[key] == match[foreignKey]; })
           match = objectMatches.length > 0;
         } else {
-          console.trace();
           throw new Error("Parse-MockDB: unknown query where clause: " + JSON.stringify(whereParams));
         }
       } else if (whereParams) {

@@ -84,6 +84,45 @@ describe('ParseMock', function(){
     });
   });
 
+  it('should find an item matching an or query', function (done) {
+    var Item = Parse.Object.extend("Item");
+    var item = new Item();
+    item.set("price", 30);
+    item.save().then(function(item) {
+      var query = new Parse.Query(Item);
+      query.equalTo("price", 30);
+
+      var otherQuery = new Parse.Query(Item);
+      otherQuery.equalTo("name", "Chicken");
+
+      var orQuery = Parse.Query.or(query, otherQuery);
+      return orQuery.find().then(function(items) {
+        assert(items[0].id == item.id);
+        done();
+      });
+    });
+  });
+
+  it('should not find any items if they do not match an or query', function (done) {
+    var Item = Parse.Object.extend("Item");
+    var item = new Item();
+    item.set("price", 30);
+    item.save().then(function(item) {
+      var query = new Parse.Query(Item);
+      query.equalTo("price", 50);
+
+      var otherQuery = new Parse.Query(Item);
+      otherQuery.equalTo("name", "Chicken");
+
+      var orQuery = Parse.Query.or(query, otherQuery);
+      return orQuery.find().then(function(items) {
+        console.log(items);
+        assert(items.length == 0);
+        done();
+      });
+    });
+  });
+
   it('should save 2 items and get one for a first() query', function (done) {
     Parse.Promise.when([createItemP(30), createItemP(20)]).then(function(item1, item2) {
       var query = new Parse.Query(Item);
