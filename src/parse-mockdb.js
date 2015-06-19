@@ -29,8 +29,11 @@ function stubSave() {
       db[options.className] = db[options.className] || [];
 
       var newObject = storableFormat(savedObj, options.className);
-      if (!_.find(db[options.className], function(obj) { return obj.id == options.id; })) {
+      var index = _.findIndex(db[options.className], function(obj) { return obj.id == options.id; });
+      if (index == -1) {
         db[options.className].push(newObject);
+      } else {
+        db[options.className][index] = newObject;
       }
       return savedObj;
     });
@@ -285,7 +288,7 @@ function evaluateObject(object, whereParams, key) {
     } else {
       throw new Error("Parse-MockDB: unknown query where clause: " + JSON.stringify(whereParams));
     }
-  } else if (whereParams) {
+  } else if (whereParams !== undefined) {
     // simple match
     return object[key] == whereParams;
   } else {
