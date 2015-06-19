@@ -262,6 +262,9 @@ function evaluateObject(object, whereParams, key) {
       });
     } else if (whereParams["$nin"]) {
       // notContainedIn
+      if (whereParams["$nin"].length == 0) {
+        return true;
+      }
       key = keyAfterSpecialCasingId(key);
       return _.find(whereParams["$nin"], function(target) {
         return !objectsAreEqual(target, object[key]);
