@@ -10,11 +10,17 @@ Supports the following methods of the Parse JS SDK (promise-form only):
 ```
 Object.set()
 Object.save()
+
 Query.find()
 Query.first()
 Query.get()
+
+Query.containedIn()
 Query.equalTo()
 Query.include()
+Query.notContainedIn()
+Query.matchesKeyInQuey()
+Query.or()
 ```
 
 Please help development of this library by adding additional features!
