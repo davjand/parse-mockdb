@@ -1,12 +1,14 @@
 {
   "name": "parse-mockdb",
-  "version": "0.0.1",
-  "description": "Parse",
+  "version": "0.0.2",
+  "description": "Parse JS SDK Mocked Backend",
   "main": "src/parse-mockdb.js",
   "engines": {
     "node": ">=0.10.3"
   },
-  "scripts": {},
+  "scripts": {
+    "test": "mocha ./test/test"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/HustleInc/parse-mockdb.git"
@@ -24,12 +26,13 @@
     "url": "https://github.com/HustleInc/parse-mockdb/issues"
   },
   "homepage": "https://github.com/HustleInc/parse-mockdb",
-  "dependencies": {},
-  "devDependencies": {
+  "dependencies": {
     "lodash": "^3.5.0",
-    "mocha": "^2.2.5",
     "parse": "^1.4.2",
     "sinon": "^1.14.1"
+  },
+  "devDependencies": {
+    "mocha": "^2.2.5"
   },
   "directories": {
     "test": "test"
