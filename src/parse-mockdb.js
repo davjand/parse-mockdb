@@ -79,8 +79,7 @@ function stubRequests() {
  * Stubs a GET request (Parse.Query.find(), get(), first())
  */
 function stubGetRequest(options) {
-  var classMatches = _.cloneDeep(db[options.className]);
-  var matches = _.filter(classMatches, queryFilter(options.data.where));
+  var matches = recursivelyMatch(options.className, options.data.where);
   matches = queryMatchesAfterIncluding(matches, options.data.include);
   ret = { "results": matches };
   return ret;
@@ -211,6 +210,16 @@ function fetchedObject(objectOrPointer) {
 }
 
 /**
+ * Given a class name and a where clause, returns DB matches by applying
+ * the where clause (recursively if nested)
+ */
+var recursivelyMatch = function(className, whereClause) {
+  var classMatches = _.cloneDeep(db[className]);
+  var matches = _.filter(classMatches, queryFilter(whereClause));
+  return matches;
+}
+
+/**
  * Returns a function that filters query matches on a where clause
  */
 function queryFilter(whereClause) {
@@ -233,6 +242,12 @@ function queryFilter(whereClause) {
           // match on an object
           var storedItem = fetchedObject(whereParams);
           match = storedItem && object[key] && (object[key].id == storedItem.objectId);
+        } else if (whereParams["$select"]) {
+          var foreignKey = whereParams["$select"]["key"];
+          var query = whereParams["$select"]["query"];
+          var matches = recursivelyMatch(query.className, query.where);
+          var objectMatches = _.filter(matches, function(match) { return object[key] == match[foreignKey]; })
+          match = objectMatches.length > 0;
         } else {
           console.trace();
           throw new Error("Parse-MockDB: unknown query where clause: " + JSON.stringify(whereParams));

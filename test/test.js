@@ -238,4 +238,34 @@ describe('ParseMock', function(){
     });
   });
 
+  it("should support a nested query", function() {
+    var brand = new Brand();
+    brand.set("name", "Acme");
+    brand.set("country", "US");
+    return brand.save().then(function(brand) {
+      var item = new Item();
+      item.set("price", 30);
+      item.set("country_code", "US");
+      item.set("state", "CA");
+      item.set("brand", brand);
+      return item.save();
+    }).then(function(item) {
+      var store = new Store();
+      store.set("state", "CA");
+      return store.save();
+    }).then(function(store) {
+      var brandQuery = new Parse.Query(Brand);
+      brandQuery.equalTo("name", "Acme");
+
+      var itemQuery = new Parse.Query(Item);
+      itemQuery.matchesKeyInQuery("country_code", "country", brandQuery);
+
+      var storeQuery = new Parse.Query(Store);
+      storeQuery.matchesKeyInQuery("state", "state", itemQuery);
+      return Parse.Promise.when([storeQuery.find(), Parse.Promise.as(store)]);
+    }).then(function(storeMatches, store) {
+      assert(storeMatches.length == 1);
+      assert(storeMatches[0].id == store.id);
+    });
+  });
 })
