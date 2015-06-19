@@ -9,7 +9,7 @@
   "scripts": {},
   "repository": {
     "type": "git",
-    "url": "https://github.com/HustleInc/parse-mockdb.git"
+    "url": "git+https://github.com/HustleInc/parse-mockdb.git"
   },
   "keywords": [
     "parse",
@@ -30,5 +30,8 @@
     "mocha": "^2.2.5",
     "parse": "^1.4.2",
     "sinon": "^1.14.1"
+  },
+  "directories": {
+    "test": "test"
   }
 }
