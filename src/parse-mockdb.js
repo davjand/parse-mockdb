@@ -1,7 +1,8 @@
 var _ = require('lodash'),
   sinon = require('sinon'),
   Parse = require('parse'),
-  db = {};
+  db = {},
+  hooks = {};
 
 if (typeof Parse.Parse != 'undefined') {
   Parse = Parse.Parse;
@@ -16,6 +17,14 @@ function mockDB() {
   stubSave();
 }
 
+function registerHook(model, hookType, fn) {
+  if (hooks[model] == undefined) {
+    hooks[model] = {};
+  }
+
+  hooks[model][hookType] = fn;
+};
+
 /**
  * Intercepts a save() request and writes the results of the save() to our
  * in-memory DB
@@ -24,12 +33,15 @@ function stubSave() {
   var realSave = Parse.Object.prototype.save;
   sinon.stub(Parse.Object.prototype, "save", function() {
     var options = this;
-    return realSave.call(this).then(function(savedObj) {
+    var className = this.className;
+    return preprocessSave(options).then(function() {
+      return realSave.call(options);
+    }).then(function(savedObj) {
       // save to our local db
-      db[options.className] = db[options.className] || [];
+      db[className] = db[className] || [];
 
       var newObject = storableFormat(savedObj, options.className);
-      var index = _.findIndex(db[options.className], function(obj) { return obj.id == options.id; });
+      var index = _.findIndex(db[className], function(obj) { return obj.id == options.id; });
       if (index == -1) {
         db[options.className].push(newObject);
       } else {
@@ -40,11 +52,24 @@ function stubSave() {
   });
 }
 
+var preprocessSave = function(options) {
+  var className = options.className;
+  if (hooks[className] && hooks[className]["beforeSave"]) {
+    return hooks[className]["beforeSave"](options._toFullJSON()).then(function(hookResults) {
+      if (hookResults.success) {
+        return Parse.Promise.as(hookResults.success);
+      }
+    });
+  }
+  return Parse.Promise.as();
+}
+
 /**
  * Unstubs Parse SDK requests and clears the local DB.
  */
 function cleanUp() {
   db = {};
+  hooks = {};
   Parse.Object.prototype.save.restore();
   Parse._request.restore();
 }
@@ -285,6 +310,8 @@ function evaluateObject(object, whereParams, key) {
         function(match) { return object[key] == match[foreignKey]; }
       );
       return objectMatches.length > 0;
+    } else if (_.has(whereParams, "$ne")) {
+      return object[key] === whereParams["$ne"];
     } else {
       throw new Error("Parse-MockDB: unknown query where clause: " + JSON.stringify(whereParams));
     }
@@ -333,6 +360,7 @@ function objectsAreEqual(obj1, obj2) {
 Parse.MockDB = {
   mockDB: mockDB,
   cleanUp: cleanUp,
+  registerHook: registerHook,
   promiseResultSync: promiseResultSync,
 };
 
