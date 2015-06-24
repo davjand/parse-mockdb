@@ -17,12 +17,33 @@ function mockDB() {
   stubSave();
 }
 
-function registerHook(model, hookType, fn) {
+/**
+ * Registers a function to be called whenever a model of a certain type is modified.
+ *
+ * @param model    | the name of the model (Parse collection name)
+ * @param hookType | the type of hook/trigger type.
+ * @param fn       | a function to be called when the hook is triggered that returns a
+ *                 | Promise. The promise format mirrors the Parse custom webhook format:
+ *                 |
+ *                 | var promiseFn = function(object) {
+ *                 |   // do validation
+ *                 |   return Parse.Promise.as({
+ *                 |     success: object
+ *                 |   }); // passed validation
+ *                 | }
+ *
+ * NOTE: only supports beforeSave hook
+ */
+function registerHook(model, hookType, promiseFn) {
+  if (hookType !== "beforeSave") {
+    throw new Error("only beforeSave hook supported");
+  }
+
   if (hooks[model] == undefined) {
     hooks[model] = {};
   }
 
-  hooks[model][hookType] = fn;
+  hooks[model][hookType] = promiseFn;
 };
 
 /**
