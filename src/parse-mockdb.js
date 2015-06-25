@@ -182,7 +182,7 @@ function storableFormat(object, className) {
     className: className,
   };
   _.each(object.attributes, function(v, k) {
-    if (v.id) {
+    if (v && v.id) {
       storableData[k] = {
         __type: "Pointer",
         objectId: v.id,
