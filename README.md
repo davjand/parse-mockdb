@@ -1,7 +1,7 @@
 Parse MockDB
 =====================
 
-[![Circle CI](https://circleci.com/gh/HustleInc/parse-mockdb/tree/master.svg?style=svg)](https://circleci.com/gh/HustleInc/parse-mockdb/tree/master)
+Master Build Status: [![Circle CI](https://circleci.com/gh/HustleInc/parse-mockdb/tree/master.svg?style=svg)](https://circleci.com/gh/HustleInc/parse-mockdb/tree/master)
 
 (Originally forked from parse-mock, https://github.com/dziamid/parse-mock)
 
