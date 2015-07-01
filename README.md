@@ -1,6 +1,8 @@
 Parse MockDB
 =====================
 
+[![Circle CI](https://circleci.com/gh/HustleInc/parse-mockdb/tree/master.svg?style=svg)](https://circleci.com/gh/HustleInc/parse-mockdb/tree/master)
+
 (Originally forked from parse-mock, https://github.com/dziamid/parse-mock)
 
 Provides a mock Parse backend and automatic stubbing of `Parse.Object.save()` and `Parse._request` to help unit test Parse cloud logic written in JavaScript.  Simply call `Parse.MockDB.mockDB()`, and Parse MockDB will store models in memory and query / filter them appropriately.
