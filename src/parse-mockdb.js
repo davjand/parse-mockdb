@@ -130,7 +130,7 @@ function stubRequests() {
 function stubGetRequest(options) {
   var matches = recursivelyMatch(options.className, options.data.where);
   matches = queryMatchesAfterIncluding(matches, options.data.include);
-  ret = { "results": matches };
+  var ret = { "results": matches };
   return ret;
 }
 
@@ -333,6 +333,8 @@ function evaluateObject(object, whereParams, key) {
       return objectMatches.length > 0;
     } else if (_.has(whereParams, "$ne")) {
       return object[key] === whereParams["$ne"];
+    } else if (_.has(whereParams, "$exists")) {
+      return object[key] !== undefined;
     } else {
       throw new Error("Parse-MockDB: unknown query where clause: " + JSON.stringify(whereParams));
     }
