@@ -331,4 +331,23 @@ describe('ParseMock', function(){
     });
   });
 
+  it('should correct count items in a matchesQuery', function (done) {
+    createBrandP("Acme").then(function(brand) {
+      createItemP(30, brand).then(function(item) {
+        createStoreWithItemP(item).then(function(store) {
+          var itemQuery = new Parse.Query(Item);
+          itemQuery.equalTo("price", 30);
+
+          var storeQuery = new Parse.Query(Store);
+          storeQuery.matchesQuery("item", itemQuery);
+          storeQuery.count().then(function(storeCount) {
+            console.log(storeCount);
+            assert(storeCount === 1);
+            done();
+          });
+        });
+      });
+    });
+  });
+
 })

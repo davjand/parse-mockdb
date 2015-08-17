@@ -130,8 +130,11 @@ function stubRequests() {
 function stubGetRequest(options) {
   var matches = recursivelyMatch(options.className, options.data.where);
   matches = queryMatchesAfterIncluding(matches, options.data.include);
-  var ret = { "results": matches };
-  return ret;
+  if (options.data.count) {
+    return { count: matches.length };
+  } else {
+    return { results: matches };
+  }
 }
 
 /**
@@ -335,6 +338,10 @@ function evaluateObject(object, whereParams, key) {
       return object[key] === whereParams["$ne"];
     } else if (_.has(whereParams, "$exists")) {
       return object[key] !== undefined;
+    } else if (whereParams["$inQuery"]) {
+      var inQuery = whereParams["$inQuery"];
+      matches = recursivelyMatch(inQuery.className, inQuery.where);
+      return _.find(matches, function(match) { return match.id === object[key].objectId; });
     } else {
       throw new Error("Parse-MockDB: unknown query where clause: " + JSON.stringify(whereParams));
     }
