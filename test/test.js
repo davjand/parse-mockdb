@@ -341,7 +341,6 @@ describe('ParseMock', function(){
           var storeQuery = new Parse.Query(Store);
           storeQuery.matchesQuery("item", itemQuery);
           storeQuery.count().then(function(storeCount) {
-            console.log(storeCount);
             assert(storeCount === 1);
             done();
           });
