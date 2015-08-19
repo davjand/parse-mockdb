@@ -324,7 +324,7 @@ function evaluateObject(object, whereParams, key) {
     } else if (whereParams["__type"] == "Pointer") {
       // match on an object
       var storedItem = fetchedObject(whereParams);
-      return storedItem && object[key] && (object[key].id == storedItem.objectId);
+      return storedItem && object[key] && objectsAreEqual(object[key], storedItem);
     } else if (whereParams["$select"]) {
       var foreignKey = whereParams["$select"]["key"];
       var query = whereParams["$select"]["query"];
