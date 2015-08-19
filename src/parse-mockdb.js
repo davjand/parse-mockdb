@@ -55,8 +55,13 @@ function stubSave() {
   sinon.stub(Parse.Object.prototype, "save", function() {
     var options = this;
     var className = this.className;
-    return preprocessSave(options).then(function() {
-      return realSave.call(options);
+    return preprocessSave(options).then(function(preprocessedOptions) {
+      if (preprocessedOptions) {
+        var model = new Parse.Object(className, _.omit(preprocessedOptions, "ACL")); // ignore ACLs for now
+        return realSave.call(model);
+      } else {
+        return realSave.call(options);
+      }
     }).then(function(savedObj) {
       // save to our local db
       db[className] = db[className] || [];
@@ -324,7 +329,7 @@ function evaluateObject(object, whereParams, key) {
     } else if (whereParams["__type"] == "Pointer") {
       // match on an object
       var storedItem = fetchedObject(whereParams);
-      return storedItem && object[key] && objectsAreEqual(object[key], storedItem);
+      return storedItem && object[key] && objectsAreEqual(storedItem, object[key]);
     } else if (whereParams["$select"]) {
       var foreignKey = whereParams["$select"]["key"];
       var query = whereParams["$select"]["query"];
