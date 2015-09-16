@@ -78,6 +78,10 @@ function stubSave() {
   });
 
   sinon.stub(Parse.Object, "saveAll", function(objects) {
+    if (objects.length === 0) {
+      return Parse.Promise.as(objects);
+    }
+
     var results = Parse.Promise.when(
       _.map(
         objects,
