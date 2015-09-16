@@ -78,7 +78,15 @@ function stubSave() {
   });
 
   sinon.stub(Parse.Object, "saveAll", function(objects) {
-    return Parse.Promise.when(_.each(objects, function(object) { return object.save(); }));
+    var results = Parse.Promise.when(
+      _.map(
+        objects,
+        function(object) { return object.save(); }
+      )
+    ).then(function() {
+      return Parse.Promise.as(arguments);
+    });
+    return results;
   });
 }
 
