@@ -76,6 +76,10 @@ function stubSave() {
       return savedObj;
     });
   });
+
+  sinon.stub(Parse.Object, "saveAll", function(objects) {
+    return Parse.Promise.when(_.each(objects, function(object) { return object.save(); }));
+  });
 }
 
 var preprocessSave = function(options) {
@@ -97,6 +101,7 @@ function cleanUp() {
   db = {};
   hooks = {};
   Parse.Object.prototype.save.restore();
+  Parse.Object.saveAll.restore();
   Parse._request.restore();
 }
 

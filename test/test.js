@@ -84,6 +84,25 @@ describe('ParseMock', function(){
     });
   });
 
+  it('should saveAll and find 2 items', function (done) {
+    var Item = Parse.Object.extend("Item");
+    var item = new Item();
+    item.set("price", 30);
+
+    var item2 = new Item();
+    item2.set("price", 30);
+    Parse.Object.saveAll([item, item2]).then(function(items) {
+      var query = new Parse.Query(Item);
+      query.equalTo("price", 30);
+      return query.find().then(function(items) {
+        assert(items.length === 2);
+        assert(items[0].get("price") == 30);
+        assert(items[1].get("price") == 30);
+        done();
+      });
+    });
+  });
+
   it('should find an item matching an or query', function (done) {
     var Item = Parse.Object.extend("Item");
     var item = new Item();
