@@ -114,7 +114,8 @@ function cleanUp() {
   hooks = {};
   Parse.Object.prototype.save.restore();
   Parse.Object.saveAll.restore();
-  Parse._request.restore();
+  //Parse._request.restore();
+  Parse.RESTController.request.restore();
 }
 
 /**
@@ -122,19 +123,41 @@ function cleanUp() {
  * successful response based on the request parameters
  */
 function stubRequests() {
-  sinon.stub(Parse, '_request', function(options) {
+  sinon.stub(Parse.RESTController, 'request', function(method,url,params,options) {
+
+	url = url.replace('classes/','');
+	var className = "";
+	if(url.lastIndexOf('/') !== -1){
+		className = url.substring(0,url.lastIndexOf('/'));
+	}
+	else{
+		className = url;
+	}
+	var id = url.substring(url.lastIndexOf('/') + 1);
+
+	var data = {};
+	data.className = className;
+	if(id){
+		data.objectId = id;
+	}
+	if(params){
+		data.data = params;
+	}
+
+
     var response, status, xhr;
-    switch (options.method) {
+    switch (method) {
     case "GET":
-      response = stubGetRequest(options);
+      response = stubGetRequest(data);
       status = "200";
       break;
+
     case "POST":
-      response = stubPostOrPutRequest(options);
+      response = stubPostOrPutRequest(data);
       status = "201";
       break;
     case "PUT":
-      response = stubPostOrPutRequest(options);
+      response = stubPostOrPutRequest(data);
       status = "200";
       break;
     default:
@@ -202,8 +225,8 @@ function promiseResultSync(promise) {
 function storableFormat(object, className) {
   var storableData = {
     id: object.id,
-    createdAt: object.createdAt.toJSON(),
-    updatedAt: object.updatedAt.toJSON(),
+//    createdAt: object.createdAt.toJSON(),
+//    updatedAt: object.updatedAt.toJSON(),
     className: className,
   };
   _.each(object.attributes, function(v, k) {

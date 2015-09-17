@@ -1,6 +1,28 @@
 Parse MockDB
 =====================
 
+#Bugfixes for version 1.6.2
+
+This branch features some semi-tested but not completely tested bugfixes for parse sdk 1.6.2
+
+The major change in the parse 1.6 is that the Parse._request has been replaced with _RESTController.request() This isn't exposed through the normal means (that I can find so far) so this code works if you add the following line of code to the parse SDK at line #1095
+
+/*
+
+	CUSTOM CODE #1000
+
+*/
+Parse.RESTController = _dereq_('./RESTController');
+/*
+
+	END CUSTOM CODE #1000
+
+*/
+
+
+
+
+
 Master Build Status: [![Circle CI](https://circleci.com/gh/HustleInc/parse-mockdb/tree/master.svg?style=svg)](https://circleci.com/gh/HustleInc/parse-mockdb/tree/master)
 
 (Originally forked from parse-mock, https://github.com/dziamid/parse-mock)
