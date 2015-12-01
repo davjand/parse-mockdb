@@ -8,6 +8,8 @@ if (typeof Parse.Parse != 'undefined') {
   Parse = Parse.Parse;
 }
 
+var parseRESTController = Parse.CoreManager.getRESTController();
+
 /**
  * Mocks a Parse API server, by intercepting requests and storing/querying data locally
  * in an in-memory DB.
@@ -115,7 +117,7 @@ function cleanUp() {
   hooks = {};
   Parse.Object.prototype.save.restore();
   Parse.Object.saveAll.restore();
-  Parse.RESTController.request.restore();
+  parseRESTController.request.restore();
 }
 
 /**
@@ -123,7 +125,7 @@ function cleanUp() {
  * successful response based on the request parameters
  */
 function stubRequests() {
-  sinon.stub(Parse.RESTController, 'request', function(method,path,params,options) {
+  sinon.stub(parseRESTController, 'request', function(method,path,params,options) {
     var response, status, xhr,data = {}; //build the options into data
     //extract the classname from the url
     var className = path.replace('classes/','');

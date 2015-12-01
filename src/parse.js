@@ -1096,18 +1096,6 @@ Parse.Session = _dereq_('./ParseSession');
 Parse.Storage = _dereq_('./Storage');
 Parse.User = _dereq_('./ParseUser');
 
-/*
-
-	CUSTOM CODE #1000
-
-*/
-Parse.RESTController = _dereq_('./RESTController');
-/*
-
-	END CUSTOM CODE #1000
-
-*/
-
 Parse._request = function () {
   for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
     args[_key] = arguments[_key];
