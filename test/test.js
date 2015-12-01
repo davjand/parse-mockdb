@@ -1,6 +1,10 @@
-var assert = require("assert")
+var assert = require("assert");
+
+var Parse = (require('../src/parse'));
 require('../src/parse-mockdb');
-var Parse = require('parse').Parse;
+
+
+
 
 var Brand = Parse.Object.extend("Brand");
 var Item = Parse.Object.extend("Item");
@@ -135,7 +139,7 @@ describe('ParseMock', function(){
 
       var orQuery = Parse.Query.or(query, otherQuery);
       return orQuery.find().then(function(items) {
-        assert(items.length == 0);
+        assert(items.length === 0);
         done();
       });
     });

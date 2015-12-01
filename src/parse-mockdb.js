@@ -1,6 +1,6 @@
 var _ = require('lodash'),
   sinon = require('sinon'),
-  Parse = require('parse'),
+  Parse = typeof(window) !== 'undefined' ? require('parse') : require("./parse"),
   db = {},
   hooks = {};
 
@@ -39,12 +39,12 @@ function registerHook(model, hookType, promiseFn) {
     throw new Error("only beforeSave hook supported");
   }
 
-  if (hooks[model] == undefined) {
+  if (hooks[model] === undefined) {
     hooks[model] = {};
   }
 
   hooks[model][hookType] = promiseFn;
-};
+}
 
 /**
  * Intercepts a save() request and writes the results of the save() to our
@@ -62,10 +62,10 @@ function stubSave() {
       } else {
         return realSave.call(options);
       }
-    }).then(function(savedObj) {
+  }).then(function(savedObj) {
       // save to our local db
-      db[className] = db[className] || [];
 
+      db[className] = db[className] || [];
       var newObject = storableFormat(savedObj, options.className);
       var index = _.findIndex(db[className], function(obj) { return obj.id == options.id; });
       if (index == -1) {
@@ -94,17 +94,18 @@ function stubSave() {
   });
 }
 
+
 var preprocessSave = function(options) {
   var className = options.className;
-  if (hooks[className] && hooks[className]["beforeSave"]) {
-    return hooks[className]["beforeSave"](options._toFullJSON()).then(function(hookResults) {
+  if (hooks[className] && hooks[className].beforeSave) {
+    return hooks[className].beforeSave(options._toFullJSON()).then(function(hookResults) {
       if (hookResults.success) {
         return Parse.Promise.as(hookResults.success);
       }
     });
   }
   return Parse.Promise.as();
-}
+};
 
 /**
  * Unstubs Parse SDK requests and clears the local DB.
@@ -114,7 +115,6 @@ function cleanUp() {
   hooks = {};
   Parse.Object.prototype.save.restore();
   Parse.Object.saveAll.restore();
-  //Parse._request.restore();
   Parse.RESTController.request.restore();
 }
 
@@ -123,47 +123,47 @@ function cleanUp() {
  * successful response based on the request parameters
  */
 function stubRequests() {
-  sinon.stub(Parse.RESTController, 'request', function(method,url,params,options) {
+  sinon.stub(Parse.RESTController, 'request', function(method,path,params,options) {
+    var response, status, xhr,data = {}; //build the options into data
+    //extract the classname from the url
+    var className = path.replace('classes/','');
+    if(className.lastIndexOf('/') !== -1){
+        className = className.substring(0,className.lastIndexOf('/'));
+    }
 
-	url = url.replace('classes/','');
-	var className = "";
-	if(url.lastIndexOf('/') !== -1){
-		className = url.substring(0,url.lastIndexOf('/'));
-	}
-	else{
-		className = url;
-	}
-	var id = url.substring(url.lastIndexOf('/') + 1);
-
-	var data = {};
-	data.className = className;
-	if(id){
-		data.objectId = id;
-	}
-	if(params){
-		data.data = params;
-	}
-
-
-    var response, status, xhr;
     switch (method) {
+
     case "GET":
-      response = stubGetRequest(data);
+      response = stubGetRequest({
+          className: className,
+          data: params || {},
+          objectId: className.substring(className.lastIndexOf('/') + 1) || null
+      });
       status = "200";
       break;
 
     case "POST":
-      response = stubPostOrPutRequest(data);
+      response = stubPostOrPutRequest({
+          data: params,
+          path: path
+      });
       status = "201";
       break;
     case "PUT":
-      response = stubPostOrPutRequest(data);
+        response = stubPostOrPutRequest({
+            data: params,
+            path: path,
+            objectId: className.substring(className.lastIndexOf('/') + 1)
+        });
       status = "200";
       break;
+      case "DELETE":
+        response = stubPostOrPutRequest(data);
+        status = "200";
+        break;
     default:
       throw new Error("unknown request type");
     }
-
     xhr = {}; // TODO
     return Parse.Promise.when([response, status, xhr]);
   });
@@ -175,6 +175,9 @@ function stubRequests() {
 function stubGetRequest(options) {
   var matches = recursivelyMatch(options.className, options.data.where);
   matches = queryMatchesAfterIncluding(matches, options.data.include);
+
+  //set matches correctly
+
   if (options.data.count) {
     return { count: matches.length };
   } else {
@@ -186,23 +189,33 @@ function stubGetRequest(options) {
  * Stubs a POST or PUT request (Parse.Object.save())
  */
 function stubPostOrPutRequest(options) {
-  if (options.route == "batch") {
+  if (options.path === "batch") {
     // batch request. handle them seperately.
     return _.map(options.data.requests, function(request) {
-      return { success: { updatedAt: (new Date()).toJSON() } };
+        if(request.method === 'POST'){
+            return { success: {
+                objectId:  _.uniqueId(),
+                createdAt: (new Date()).toJSON(),
+                updatedAt: (new Date()).toJSON()
+            } };
+        }else{
+          return { success: {
+              updatedAt: (new Date()).toJSON(),
+              createdAt: (new Date()).toJSON(),
+          } };
+        }
     });
   }
 
   if (options.objectId) {
-    return Parse.Promise.as({ updatedAt: (new Date()).toJSON() });
+    return { updatedAt: (new Date()).toJSON() };
   }
 
-  var promise = new Parse.Promise.as({
-    id:  _.uniqueId(),
+  return {
+    objectId:  _.uniqueId(),
     createdAt: (new Date()).toJSON(),
     updatedAt: (new Date()).toJSON()
-  });
-  return promise;
+  };
 }
 
 /**
@@ -225,8 +238,9 @@ function promiseResultSync(promise) {
 function storableFormat(object, className) {
   var storableData = {
     id: object.id,
-//    createdAt: object.createdAt.toJSON(),
-//    updatedAt: object.updatedAt.toJSON(),
+    objectId: object.id,
+    createdAt: object.createdAt,
+    updatedAt: object.updatedAt,
     className: className,
   };
   _.each(object.attributes, function(v, k) {
@@ -439,4 +453,4 @@ Parse.MockDB = {
   promiseResultSync: promiseResultSync,
 };
 
-module.exports = Parse.MockDB;
+//module.exports = Parse.MockDB;
